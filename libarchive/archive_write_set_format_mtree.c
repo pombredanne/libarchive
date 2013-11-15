@@ -399,7 +399,8 @@ mtree_indent(struct mtree_writer *mtree)
 				for (i = 0; i < (INDENTNAMELEN + 1 + pd); i++)
 					archive_strappend_char(&mtree->buf, ' ');
 			} else {
-				for (i = r -s + nd; i < (INDENTNAMELEN + 1); i++)
+				for (i = (int)(r -s + nd);
+				    i < (INDENTNAMELEN + 1); i++)
 					archive_strappend_char(&mtree->buf, ' ');
 			}
 			s = ++r;
@@ -1854,9 +1855,9 @@ mtree_entry_setup_filenames(struct archive_write *a, struct mtree_entry *file,
 		return (ret);
 	}
 
-	/* Make a basename from dirname and slash */
+	/* Make a basename from file->parentdir.s and slash */
 	*slash  = '\0';
-	file->parentdir.length = slash - dirname;
+	file->parentdir.length = slash - file->parentdir.s;
 	archive_strcpy(&(file->basename),  slash + 1);
 	return (ret);
 }
@@ -1949,10 +1950,10 @@ mtree_entry_find_child(struct mtree_entry *parent, const char *child_name)
 }
 
 static int
-get_path_component(char *name, int n, const char *fn)
+get_path_component(char *name, size_t n, const char *fn)
 {
 	char *p;
-	int l;
+	size_t l;
 
 	p = strchr(fn, '/');
 	if (p == NULL) {
@@ -1965,7 +1966,7 @@ get_path_component(char *name, int n, const char *fn)
 	memcpy(name, fn, l);
 	name[l] = '\0';
 
-	return (l);
+	return ((int)l);
 }
 
 /*

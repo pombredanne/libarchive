@@ -1376,6 +1376,7 @@ add_entry(struct archive_match *a, int flag,
 	archive_mstring_copy_wcs(&(f->pathname), pathname);
 	a->exclusion_tree.rbt_ops = &rb_ops_wcs;
 #else
+	(void)rb_ops_wcs;
 	pathname = archive_entry_pathname(entry);
 	if (pathname == NULL) {
 		free(f);
@@ -1515,6 +1516,7 @@ time_excluded(struct archive_match *a, struct archive_entry *entry)
 	pathname = archive_entry_pathname_w(entry);
 	a->exclusion_tree.rbt_ops = &rb_ops_wcs;
 #else
+	(void)rb_ops_wcs;
 	pathname = archive_entry_pathname(entry);
 	a->exclusion_tree.rbt_ops = &rb_ops_mbs;
 #endif
@@ -1712,7 +1714,7 @@ match_owner_id(struct id_array *ids, int64_t id)
 	unsigned b, m, t;
 
 	t = 0;
-	b = ids->count;
+	b = (unsigned)ids->count;
 	while (t < b) {
 		m = (t + b)>>1;
 		if (ids->ids[m] == id)

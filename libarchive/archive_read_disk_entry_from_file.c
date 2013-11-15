@@ -49,17 +49,16 @@ __FBSDID("$FreeBSD: head/lib/libarchive/archive_read_disk_entry_from_file.c 2010
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
-#ifdef HAVE_SYS_XATTR_H
+#if defined(HAVE_SYS_XATTR_H)
 #include <sys/xattr.h>
+#elif defined(HAVE_ATTR_XATTR_H)
+#include <attr/xattr.h>
 #endif
 #ifdef HAVE_SYS_EA_H
 #include <sys/ea.h>
 #endif
 #ifdef HAVE_ACL_LIBACL_H
 #include <acl/libacl.h>
-#endif
-#ifdef HAVE_ATTR_XATTR_H
-#include <attr/xattr.h>
 #endif
 #ifdef HAVE_COPYFILE_H
 #include <copyfile.h>
@@ -103,6 +102,10 @@ __FBSDID("$FreeBSD: head/lib/libarchive/archive_read_disk_entry_from_file.c 2010
 #include "archive_entry.h"
 #include "archive_private.h"
 #include "archive_read_disk_private.h"
+
+#ifndef O_CLOEXEC
+#define O_CLOEXEC	0
+#endif
 
 /*
  * Linux and FreeBSD plug this obvious hole in POSIX.1e in
@@ -193,9 +196,11 @@ archive_read_disk_entry_from_file(struct archive *_a,
 		if (fd < 0) {
 			if (a->tree != NULL)
 				fd = a->open_on_current_dir(a->tree, path,
-					O_RDONLY | O_NONBLOCK);
+					O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 			else
-				fd = open(path, O_RDONLY | O_NONBLOCK);
+				fd = open(path, O_RDONLY | O_NONBLOCK |
+						O_CLOEXEC);
+			__archive_ensure_cloexec_flag(fd);
 		}
 		if (fd >= 0) {
 			int stflags;
@@ -286,9 +291,10 @@ setup_mac_metadata(struct archive_read_disk *a,
 	int copyfile_flags = COPYFILE_NOFOLLOW | COPYFILE_ACL | COPYFILE_XATTR;
 	struct stat copyfile_stat;
 	int ret = ARCHIVE_OK;
-	void *buff;
+	void *buff = NULL;
 	int have_attrs;
-	const char *name, *tempdir, *tempfile = NULL;
+	const char *name, *tempdir;
+	struct archive_string tempfile;
 
 	(void)fd; /* UNUSED */
 	name = archive_entry_sourcepath(entry);
@@ -323,22 +329,25 @@ setup_mac_metadata(struct archive_read_disk *a,
 		tempdir = getenv("TMPDIR");
 	if (tempdir == NULL)
 		tempdir = _PATH_TMP;
-	tempfile = tempnam(tempdir, "tar.md.");
+	archive_string_init(&tempfile);
+	archive_strcpy(&tempfile, tempdir);
+	archive_strcat(&tempfile, "tar.md.XXXXXX");
+	tempfd = mkstemp(tempfile.s);
+	if (tempfd < 0) {
+		archive_set_error(&a->archive, errno,
+		    "Could not open extended attribute file");
+		ret = ARCHIVE_WARN;
+		goto cleanup;
+	}
+	__archive_ensure_cloexec_flag(tempfd);
 
 	/* XXX I wish copyfile() could pack directly to a memory
 	 * buffer; that would avoid the temp file here.  For that
 	 * matter, it would be nice if fcopyfile() actually worked,
 	 * that would reduce the many open/close races here. */
-	if (copyfile(name, tempfile, 0, copyfile_flags | COPYFILE_PACK)) {
+	if (copyfile(name, tempfile.s, 0, copyfile_flags | COPYFILE_PACK)) {
 		archive_set_error(&a->archive, errno,
 		    "Could not pack extended attributes");
-		ret = ARCHIVE_WARN;
-		goto cleanup;
-	}
-	tempfd = open(tempfile, O_RDONLY);
-	if (tempfd < 0) {
-		archive_set_error(&a->archive, errno,
-		    "Could not open extended attribute file");
 		ret = ARCHIVE_WARN;
 		goto cleanup;
 	}
@@ -364,10 +373,12 @@ setup_mac_metadata(struct archive_read_disk *a,
 	archive_entry_copy_mac_metadata(entry, buff, copyfile_stat.st_size);
 
 cleanup:
-	if (tempfd >= 0)
+	if (tempfd >= 0) {
 		close(tempfd);
-	if (tempfile != NULL)
-		unlink(tempfile);
+		unlink(tempfile.s);
+	}
+	archive_string_free(&tempfile);
+	free(buff);
 	return (ret);
 }
 
@@ -1035,14 +1046,15 @@ setup_sparse(struct archive_read_disk *a,
 			path = archive_entry_pathname(entry);
 		if (a->tree != NULL)
 			*fd = a->open_on_current_dir(a->tree, path,
-				O_RDONLY | O_NONBLOCK);
+				O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 		else
-			*fd = open(path, O_RDONLY | O_NONBLOCK);
+			*fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 		if (*fd < 0) {
 			archive_set_error(&a->archive, errno,
 			    "Can't open `%s'", path);
 			return (ARCHIVE_FAILED);
 		}
+		__archive_ensure_cloexec_flag(*fd);
 	}
 
 	/* Initialize buffer to avoid the error valgrind complains about. */
@@ -1148,12 +1160,13 @@ setup_sparse(struct archive_read_disk *a,
 			
 		if (pathconf(path, _PC_MIN_HOLE_SIZE) <= 0)
 			return (ARCHIVE_OK);
-		*fd = open(path, O_RDONLY | O_NONBLOCK);
+		*fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 		if (*fd < 0) {
 			archive_set_error(&a->archive, errno,
 			    "Can't open `%s'", path);
 			return (ARCHIVE_FAILED);
 		}
+		__archive_ensure_cloexec_flag(*fd);
 		initial_off = 0;
 	}
 

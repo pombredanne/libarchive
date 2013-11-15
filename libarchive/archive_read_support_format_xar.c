@@ -467,6 +467,7 @@ archive_read_support_format_xar(struct archive *_a)
 	    xar_read_header,
 	    xar_read_data,
 	    xar_read_data_skip,
+	    NULL,
 	    xar_cleanup);
 	if (r != ARCHIVE_OK)
 		free(xar);
@@ -966,10 +967,14 @@ move_reading_point(struct archive_read *a, uint64_t offset)
 				return ((int)step);
 			xar->offset += step;
 		} else {
-			archive_set_error(&(a->archive),
-			    ARCHIVE_ERRNO_MISC,
-			    "Cannot seek.");
-			return (ARCHIVE_FAILED);
+			int64_t pos = __archive_read_seek(a, offset, SEEK_SET);
+			if (pos == ARCHIVE_FAILED) {
+				archive_set_error(&(a->archive),
+				    ARCHIVE_ERRNO_MISC,
+				    "Cannot seek.");
+				return (ARCHIVE_FAILED);
+			}
+			xar->offset = pos;
 		}
 	}
 	return (ARCHIVE_OK);
