@@ -281,6 +281,9 @@ int canRunCommand(const char *);
 /* Return true if this platform can run the "lrzip" program. */
 int canLrzip(void);
 
+/* Return true if this platform can run the "lz4" program. */
+int canLz4(void);
+
 /* Return true if this platform can run the "lzip" program. */
 int canLzip(void);
 
@@ -303,8 +306,13 @@ int is_LargeInode(const char *);
 /* Supports printf-style args: slurpfile(NULL, "%s/myfile", refdir); */
 char *slurpfile(size_t *, const char *fmt, ...);
 
+/* Dump block of bytes to a file. */
+void dumpfile(const char *filename, void *, size_t);
+
 /* Extracts named reference file to the current directory. */
 void extract_reference_file(const char *);
+/* Copies named reference file to the current directory. */
+void copy_reference_file(const char *);
 
 /* Extracts a list of files to the current directory.
  * List must be NULL terminated.
@@ -312,7 +320,7 @@ void extract_reference_file(const char *);
 void extract_reference_files(const char **);
 
 /* Path to working directory for current test */
-const char *testworkdir;
+extern const char *testworkdir;
 
 /*
  * Special interfaces for libarchive test harness.

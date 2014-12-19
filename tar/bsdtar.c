@@ -178,21 +178,8 @@ main(int argc, char **argv)
 	}
 #endif
 
-
-	/* Need lafe_progname before calling lafe_warnc. */
-	if (*argv == NULL)
-		lafe_progname = "bsdtar";
-	else {
-#if defined(_WIN32) && !defined(__CYGWIN__)
-		lafe_progname = strrchr(*argv, '\\');
-		if (strrchr(*argv, '/') > lafe_progname)
-#endif
-		lafe_progname = strrchr(*argv, '/');
-		if (lafe_progname != NULL)
-			lafe_progname++;
-		else
-			lafe_progname = *argv;
-	}
+	/* Set lafe_progname before calling lafe_warnc. */
+	lafe_setprogname(*argv, "bsdtar");
 
 #if HAVE_SETLOCALE
 	if (setlocale(LC_ALL, "") == NULL)
@@ -352,6 +339,9 @@ main(int argc, char **argv)
 			bsdtar->extract_flags |=
 			    ARCHIVE_EXTRACT_HFS_COMPRESSION_FORCED;
 			break;
+		case OPTION_IGNORE_ZEROS:
+			bsdtar->option_ignore_zeros = 1;
+			break;
 		case 'I': /* GNU tar */
 			/*
 			 * TODO: Allow 'names' to come from an archive,
@@ -407,6 +397,7 @@ main(int argc, char **argv)
 			bsdtar->option_warn_links = 1;
 			break;
 		case OPTION_LRZIP:
+		case OPTION_LZ4:
 		case OPTION_LZIP: /* GNU tar beginning with 1.23 */
 		case OPTION_LZMA: /* GNU tar beginning with 1.20 */
 		case OPTION_LZOP: /* GNU tar beginning with 1.21 */
@@ -417,6 +408,7 @@ main(int argc, char **argv)
 			compression = opt;
 			switch (opt) {
 			case OPTION_LRZIP: compression_name = "lrzip"; break;
+			case OPTION_LZ4:  compression_name = "lz4"; break;
 			case OPTION_LZIP: compression_name = "lzip"; break; 
 			case OPTION_LZMA: compression_name = "lzma"; break; 
 			case OPTION_LZOP: compression_name = "lzop"; break; 
@@ -556,6 +548,9 @@ main(int argc, char **argv)
 			bsdtar->extract_flags |= ARCHIVE_EXTRACT_XATTR;
 			bsdtar->extract_flags |= ARCHIVE_EXTRACT_FFLAGS;
 			bsdtar->extract_flags |= ARCHIVE_EXTRACT_MAC_METADATA;
+			break;
+		case OPTION_PASSPHRASE:
+			bsdtar->passphrase = bsdtar->argument;
 			break;
 		case OPTION_POSIX: /* GNU tar */
 			cset_set_format(bsdtar->cset, "pax");
@@ -810,6 +805,7 @@ main(int argc, char **argv)
 	cleanup_substitution(bsdtar);
 #endif
 	cset_free(bsdtar->cset);
+	passphrase_free(bsdtar->ppbuff);
 
 	if (bsdtar->return_value != 0)
 		lafe_warnc(0,
@@ -844,7 +840,7 @@ usage(void)
 {
 	const char	*p;
 
-	p = lafe_progname;
+	p = lafe_getprogname();
 
 	fprintf(stderr, "Usage:\n");
 	fprintf(stderr, "  List:    %s -tf <archive-filename>\n", p);
@@ -859,7 +855,7 @@ version(void)
 {
 	printf("bsdtar %s - %s\n",
 	    BSDTAR_VERSION_STRING,
-	    archive_version_string());
+	    archive_version_details());
 	exit(0);
 }
 
@@ -904,7 +900,7 @@ long_help(void)
 	const char	*prog;
 	const char	*p;
 
-	prog = lafe_progname;
+	prog = lafe_getprogname();
 
 	fflush(stderr);
 

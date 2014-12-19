@@ -66,6 +66,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <time.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -278,6 +279,9 @@ int canGzip(void);
 /* Return true if this platform can run the "lrzip" program. */
 int canLrzip(void);
 
+/* Return true if this platform can run the "lz4" program. */
+int canLz4(void);
+
 /* Return true if this platform can run the "lzip" program. */
 int canLzip(void);
 
@@ -302,19 +306,21 @@ char *slurpfile(size_t *, const char *fmt, ...);
 
 /* Extracts named reference file to the current directory. */
 void extract_reference_file(const char *);
+/* Copies named reference file to the current directory. */
+void copy_reference_file(const char *);
 
 /* Path to working directory for current test */
-const char *testworkdir;
+extern const char *testworkdir;
 
 /*
  * Special interfaces for program test harness.
  */
 
 /* Pathname of exe to be tested. */
-const char *testprogfile;
+extern const char *testprogfile;
 /* Name of exe to use in printf-formatted command strings. */
 /* On Windows, this includes leading/trailing quotes. */
-const char *testprog;
+extern const char *testprog;
 
 #ifdef USE_DMALLOC
 #include <dmalloc.h>

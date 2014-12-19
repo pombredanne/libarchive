@@ -10,6 +10,7 @@ m4_define([LIBARCHIVE_VERSION_N],[3001002])
 dnl bsdtar and bsdcpio versioning tracks libarchive
 m4_define([BSDTAR_VERSION_S],LIBARCHIVE_VERSION_S())
 m4_define([BSDCPIO_VERSION_S],LIBARCHIVE_VERSION_S())
+m4_define([BSDCAT_VERSION_S],LIBARCHIVE_VERSION_S())
 
 AC_PREREQ(2.65)
 
@@ -53,12 +54,15 @@ AC_DEFINE([BSDCPIO_VERSION_STRING],"BSDCPIO_VERSION_S()",
 	[Version number of bsdcpio])
 AC_DEFINE([BSDTAR_VERSION_STRING],"BSDTAR_VERSION_S()",
 	[Version number of bsdtar])
+AC_DEFINE([BSDCAT_VERSION_STRING],"BSDTAR_VERSION_S()",
+	[Version number of bsdcat])
 
 # The shell variables here must be the same as the AC_SUBST() variables
 # below, but the shell variable names apparently cannot be the same as
 # the m4 macro names above.  Why?  Ask autoconf.
 BSDCPIO_VERSION_STRING=BSDCPIO_VERSION_S()
 BSDTAR_VERSION_STRING=BSDTAR_VERSION_S()
+BSDCAT_VERSION_STRING=BSDCAT_VERSION_S()
 LIBARCHIVE_VERSION_STRING=LIBARCHIVE_VERSION_S()
 LIBARCHIVE_VERSION_NUMBER=LIBARCHIVE_VERSION_N()
 
@@ -68,6 +72,7 @@ LIBARCHIVE_VERSION_NUMBER=LIBARCHIVE_VERSION_N()
 AC_SUBST(ARCHIVE_LIBTOOL_VERSION)
 AC_SUBST(BSDCPIO_VERSION_STRING)
 AC_SUBST(BSDTAR_VERSION_STRING)
+AC_SUBST(BSDCAT_VERSION_STRING)
 AC_SUBST(LIBARCHIVE_VERSION_STRING)
 AC_SUBST(LIBARCHIVE_VERSION_NUMBER)
 
@@ -148,6 +153,50 @@ AM_CONDITIONAL([BUILD_BSDTAR], [ test "$build_bsdtar" = yes ])
 AM_CONDITIONAL([STATIC_BSDTAR], [ test "$static_bsdtar" = yes ])
 
 #
+# Options for building bsdcat.
+#
+# Default is to build bsdcat, but allow people to override that.
+#
+AC_ARG_ENABLE([bsdcat],
+	[AS_HELP_STRING([--enable-bsdcat], [enable build of bsdcat (default)])
+	AS_HELP_STRING([--enable-bsdcat=static], [force static build of bsdcat])
+	AS_HELP_STRING([--enable-bsdcat=shared], [force dynamic build of bsdcat])
+AS_HELP_STRING([--disable-bsdcat], [disable build of bsdcat])],
+	[], [enable_bsdcat=yes])
+
+case "$enable_bsdcat" in
+yes)
+	if test "$enable_static" = "no"; then
+		static_bsdcat=no
+	else
+		static_bsdcat=yes
+	fi
+	build_bsdcat=yes
+	;;
+dynamic|shared)
+	if test "$enable_shared" = "no"; then
+		AC_MSG_FAILURE([Shared linking of bsdcat requires shared libarchive])
+	fi
+	build_bsdcat=yes
+	static_bsdcat=no
+	;;
+static)
+	build_bsdcat=yes
+	static_bsdcat=yes
+	;;
+no)
+	build_bsdcat=no
+	static_bsdcat=no
+	;;
+*)
+	AC_MSG_FAILURE([Unsupported value for --enable-bsdcat])
+	;;
+esac
+
+AM_CONDITIONAL([BUILD_BSDCAT], [ test "$build_bsdcat" = yes ])
+AM_CONDITIONAL([STATIC_BSDCAT], [ test "$static_bsdcat" = yes ])
+
+#
 # Options for building bsdcpio.
 #
 # Default is not to build bsdcpio, but that can be overridden.
@@ -218,7 +267,8 @@ AS_VAR_IF([ac_cv_have_decl_EXT2_IOC_GETFLAGS], [yes],
 
 AC_CHECK_HEADERS([inttypes.h io.h langinfo.h limits.h])
 AC_CHECK_HEADERS([linux/fiemap.h linux/fs.h linux/magic.h linux/types.h])
-AC_CHECK_HEADERS([locale.h paths.h poll.h pwd.h signal.h spawn.h])
+AC_CHECK_HEADERS([locale.h paths.h poll.h pthread.h pwd.h])
+AC_CHECK_HEADERS([readpassphrase.h signal.h spawn.h])
 AC_CHECK_HEADERS([stdarg.h stdint.h stdlib.h string.h])
 AC_CHECK_HEADERS([sys/acl.h sys/cdefs.h sys/extattr.h])
 AC_CHECK_HEADERS([sys/ioctl.h sys/mkdev.h sys/mount.h])
@@ -226,6 +276,7 @@ AC_CHECK_HEADERS([sys/param.h sys/poll.h sys/select.h sys/statfs.h sys/statvfs.h
 AC_CHECK_HEADERS([sys/time.h sys/utime.h sys/utsname.h sys/vfs.h])
 AC_CHECK_HEADERS([time.h unistd.h utime.h wchar.h wctype.h])
 AC_CHECK_HEADERS([windows.h])
+AC_CHECK_HEADERS([Bcrypt.h])
 # check windows.h first; the other headers require it.
 AC_CHECK_HEADERS([wincrypt.h winioctl.h],[],[],
 [[#ifdef HAVE_WINDOWS_H
@@ -297,6 +348,14 @@ if test "x$with_iconv" != "xno"; then
       AC_CHECK_LIB(charset,locale_charset)
     fi
   fi
+fi
+
+AC_ARG_WITH([lz4],
+  AS_HELP_STRING([--without-lz4], [Don't build support for lz4 through liblz4]))
+
+if test "x$with_lz4" != "xno"; then
+  AC_CHECK_HEADERS([lz4.h lz4hc.h])
+  AC_CHECK_LIB(lz4,LZ4_decompress_safe)
 fi
 
 AC_ARG_WITH([lzma],
@@ -512,7 +571,7 @@ AC_FUNC_VPRINTF
 # To avoid necessity for including windows.h or special forward declaration
 # workarounds, we use 'void *' for 'struct SECURITY_ATTRIBUTES *'
 AC_CHECK_STDCALL_FUNC([CreateHardLinkA],[const char *, const char *, void *])
-AC_CHECK_FUNCS([chflags chown chroot ctime_r dirfd])
+AC_CHECK_FUNCS([arc4random_buf chflags chown chroot ctime_r dirfd])
 AC_CHECK_FUNCS([fchdir fchflags fchmod fchown fcntl fdopendir fork])
 AC_CHECK_FUNCS([fstat fstatat fstatfs fstatvfs ftruncate])
 AC_CHECK_FUNCS([futimens futimes futimesat])
@@ -522,6 +581,7 @@ AC_CHECK_FUNCS([lchflags lchmod lchown link localtime_r lstat lutimes])
 AC_CHECK_FUNCS([mbrtowc memmove memset])
 AC_CHECK_FUNCS([mkdir mkfifo mknod mkstemp])
 AC_CHECK_FUNCS([nl_langinfo openat pipe poll posix_spawnp readlink readlinkat])
+AC_CHECK_FUNCS([readpassphrase])
 AC_CHECK_FUNCS([select setenv setlocale sigaction statfs statvfs])
 AC_CHECK_FUNCS([strchr strdup strerror strncpy_s strrchr symlink timegm])
 AC_CHECK_FUNCS([tzset unsetenv utime utimensat utimes vfork])
@@ -642,7 +702,7 @@ AC_DEFUN([CRYPTO_CHECK], [
 #define ARCHIVE_CRYPTO_$1_$2
 #define PLATFORM_CONFIG_H "check_crypto_md.h"
 
-$(cat "$srcdir/libarchive/archive_crypto.c")
+$(cat "$srcdir/libarchive/archive_digest.c")
 
 int
 main(int argc, char **argv)
@@ -727,6 +787,8 @@ if test "x$with_nettle" != "xno"; then
     CRYPTO_CHECK(SHA512, NETTLE, sha512)
     if test "x$found_NETTLE" != "xyes"; then
       LIBS=$saved_LIBS
+    else
+      AC_CHECK_HEADERS([nettle/pbkdf2.h])
     fi
 fi
 if test "x$with_openssl" != "xno"; then
@@ -758,6 +820,8 @@ if test "x$with_openssl" != "xno"; then
     CRYPTO_CHECK(SHA512, OPENSSL, sha512)
     if test "x$found_OPENSSL" != "xyes"; then
       LIBS=$saved_LIBS
+    else
+      AC_CHECK_FUNCS([PKCS5_PBKDF2_HMAC_SHA1])
     fi
 fi
 
@@ -784,5 +848,9 @@ case "$host_os" in
 	CRYPTO_CHECK_WIN(SHA512, CALG_SHA_512)
 	;;
 esac
+
+# Ensure test directories are present if building out-of-tree
+AC_CONFIG_COMMANDS([mkdirs],
+		   [mkdir -p {libarchive,tar,cat,cpio}/test])
 
 AC_OUTPUT
