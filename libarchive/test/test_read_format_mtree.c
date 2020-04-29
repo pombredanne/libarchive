@@ -134,6 +134,12 @@ test_read_format_mtree1(void)
 	assertEqualIntA(a, archive_read_has_encrypted_entries(a), ARCHIVE_READ_FORMAT_ENCRYPTION_UNSUPPORTED);
 
 	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
+	assertEqualString(archive_entry_pathname(ae), "dir2/dir3b/filename\\with_esc\b\t\fapes");
+	assertEqualInt(archive_entry_filetype(ae), AE_IFREG);
+	assertEqualInt(archive_entry_is_encrypted(ae), 0);
+	assertEqualIntA(a, archive_read_has_encrypted_entries(a), ARCHIVE_READ_FORMAT_ENCRYPTION_UNSUPPORTED);
+
+	assertEqualIntA(a, ARCHIVE_OK, archive_read_next_header(a, &ae));
 	assertEqualString(archive_entry_pathname(ae), "notindir");
 	assertEqualInt(archive_entry_is_encrypted(ae), 0);
 	assertEqualIntA(a, archive_read_has_encrypted_entries(a), ARCHIVE_READ_FORMAT_ENCRYPTION_UNSUPPORTED);
@@ -177,7 +183,7 @@ test_read_format_mtree1(void)
 	min_time = archive_entry_mtime(ae);
 	assert(min_time <= 0);
 	/* Simply asserting min_time - 1 > 0 breaks with some compiler optimizations. */
-	t = min_time - 1;
+	t = (time_t)((uintmax_t)min_time - 1);
 	assert(t > 0);
 	assertEqualInt(archive_entry_is_encrypted(ae), 0);
 	assertEqualIntA(a, archive_read_has_encrypted_entries(a), ARCHIVE_READ_FORMAT_ENCRYPTION_UNSUPPORTED);
@@ -191,7 +197,7 @@ test_read_format_mtree1(void)
 	assertEqualIntA(a, archive_read_has_encrypted_entries(a), ARCHIVE_READ_FORMAT_ENCRYPTION_UNSUPPORTED);
 
 	assertEqualIntA(a, ARCHIVE_EOF, archive_read_next_header(a, &ae));
-	assertEqualInt(19, archive_file_count(a));
+	assertEqualInt(20, archive_file_count(a));
 	assertEqualInt(ARCHIVE_OK, archive_read_close(a));
 	assertEqualInt(ARCHIVE_OK, archive_read_free(a));
 }
@@ -711,4 +717,28 @@ DEFINE_TEST(test_read_format_mtree_nonexistent_contents_file)
 	assertEqualInt(ARCHIVE_OK, archive_read_close(a));
 	assertEqualInt(ARCHIVE_OK, archive_read_free(a));
 }
+/*
+ * Check mtree file with non-printable ascii characters
+ */
+DEFINE_TEST(test_read_format_mtree_noprint)
+{
+	const char reffile[] = "test_read_format_mtree_noprint.mtree";
+	struct archive_entry *ae;
+	struct archive *a;
 
+	extract_reference_file(reffile);
+
+	assert((a = archive_read_new()) != NULL);
+	assertEqualIntA(a, ARCHIVE_OK,
+	    archive_read_support_filter_all(a));
+	assertEqualIntA(a, ARCHIVE_OK,
+	    archive_read_support_format_all(a));
+	assertEqualIntA(a, ARCHIVE_OK,
+	    archive_read_open_filename(a, reffile, 11));
+
+	assertEqualIntA(a, ARCHIVE_FATAL, archive_read_next_header(a, &ae));
+	assertEqualString("Can't parse line 3", archive_error_string(a));
+
+	assertEqualInt(ARCHIVE_OK, archive_read_close(a));
+	assertEqualInt(ARCHIVE_OK, archive_read_free(a));
+}

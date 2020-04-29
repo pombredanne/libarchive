@@ -28,26 +28,31 @@
  * Borrowed from FreeBSD's <sys/endian.h>
  */
 
-#ifndef __LIBARCHIVE_BUILD
-#error This header is only to be used internally to libarchive.
-#endif
+#ifndef ARCHIVE_ENDIAN_H_INCLUDED
+#define ARCHIVE_ENDIAN_H_INCLUDED
 
 /* Note:  This is a purely internal header! */
 /* Do not use this outside of libarchive internal code! */
 
-#ifndef ARCHIVE_ENDIAN_H_INCLUDED
-#define ARCHIVE_ENDIAN_H_INCLUDED
-
+#ifndef __LIBARCHIVE_BUILD
+#error This header is only to be used internally to libarchive.
+#endif
 
 /*
  * Disabling inline keyword for compilers known to choke on it:
  * - Watcom C++ in C code.  (For any version?)
  * - SGI MIPSpro
  * - Microsoft Visual C++ 6.0 (supposedly newer versions too)
+ * - IBM VisualAge 6 (XL v6)
+ * - Sun WorkShop C (SunPro) before 5.9
  */
 #if defined(__WATCOMC__) || defined(__sgi) || defined(__hpux) || defined(__BORLANDC__)
 #define	inline
-#elif defined(_MSC_VER)
+#elif defined(__IBMC__) && __IBMC__ < 700
+#define	inline
+#elif defined(__SUNPRO_C) && __SUNPRO_C < 0x590
+#define inline
+#elif defined(_MSC_VER) || defined(__osf__)
 #define inline __inline
 #endif
 

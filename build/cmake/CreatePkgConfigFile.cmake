@@ -24,8 +24,10 @@ ENDFOREACH()
 #	 thus there's a good chance it'll make some binutils versions unhappy...
 #	 This only affects Libs.private (looked up for static builds) though.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/build/pkgconfig/libarchive.pc.in
-		${CMAKE_CURRENT_SOURCE_DIR}/build/pkgconfig/libarchive.pc
+		${CMAKE_CURRENT_BINARY_DIR}/build/pkgconfig/libarchive.pc
 		@ONLY)
 # And install it, of course ;).
-INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/build/pkgconfig/libarchive.pc
-	DESTINATION "lib/pkgconfig")
+IF(ENABLE_INSTALL)
+  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/build/pkgconfig/libarchive.pc
+          DESTINATION "lib/pkgconfig")
+ENDIF()
